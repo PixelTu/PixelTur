@@ -56,8 +56,8 @@
     const ctx = canvas.getContext("2d");
     const container = document.getElementById("canvas-container");
 
-    // WebSocket Render backend bağlantısı
-    const ws = new WebSocket("wss://" + window.location.host);
+    // Render backend URL (senin verdiğin adresi buraya koydum)
+    const ws = new WebSocket("wss://pixeltu.onrender.com");
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
