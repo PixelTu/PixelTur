@@ -1,105 +1,108 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8">
-<title>PixelTur</title>
-<style>
-  body { margin:0; background:#111; overflow:hidden; }
-  canvas { background:#fff; display:block; touch-action:none; }
-  #palette {
-    position:fixed; bottom:0; left:0; right:0;
-    background:#222; padding:8px;
-    display:flex; gap:6px; overflow-x:auto; justify-content:center;
-  }
-  .color { width:24px; height:24px; border:1px solid #555; flex-shrink:0; }
-  .selected { border:2px solid gold; }
-  #cooldown {
-    position:fixed; top:10px; right:10px;
-    background:#222; padding:6px 10px; border-radius:6px;
-    font-size:14px; font-weight:bold; color:lime;
-  }
-  #founder {
-    position:fixed; top:10px; left:10px;
-    background:#222; padding:6px 10px; border-radius:6px;
-    font-size:14px; font-weight:bold; color:#FFD700;
-  }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Pixel Board</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+
+    /* Üst yazılar */
+    #header {
+      text-align: center;
+      font-size: 20px;
+      font-weight: bold;
+      padding: 10px;
+    }
+
+    /* Mobilde butonları büyüt */
+    button {
+      min-width: 48px;
+      min-height: 48px;
+      font-size: 16px;
+      margin: 5px;
+    }
+
+    /* Canvas kapsayıcı */
+    #canvas-container {
+      width: 100vw;
+      height: 100vh;
+      overflow: scroll;
+      touch-action: pan-x pan-y;
+    }
+
+    canvas {
+      background: #eee;
+      display: block;
+      margin: auto;
+    }
+  </style>
 </head>
 <body>
+  <div id="header">
+    beyaz234<br>
+    Yapımcılar: TFSOO & Babapiro
+  </div>
+  <div id="canvas-container">
+    <canvas id="board" width="2000" height="2000"></canvas>
+  </div>
 
-<canvas id="board"></canvas>
-<div id="cooldown">Hazır!</div>
-<div id="founder">Founder: Beyaz234 & TFSOO</div>
-<div id="palette"></div>
+  <script>
+    const canvas = document.getElementById("board");
+    const ctx = canvas.getContext("2d");
+    const container = document.getElementById("canvas-container");
 
-<script>
-const canvas=document.getElementById("board");
-const ctx=canvas.getContext("2d");
+    // WebSocket Render backend bağlantısı
+    const ws = new WebSocket("wss://" + window.location.host);
 
-const gridSize=200, cellSize=5;
-canvas.width=gridSize*cellSize;
-canvas.height=gridSize*cellSize;
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === "init") {
+        data.board.forEach(p => {
+          ctx.fillStyle = p.color;
+          ctx.fillRect(p.x, p.y, 1, 1);
+        });
+      }
+      if (data.type === "update") {
+        ctx.fillStyle = data.color;
+        ctx.fillRect(data.x, data.y, 1, 1);
+      }
+    };
 
-/* Palet */
-const colors=["#FF0000","#00FF00","#0000FF","#FFFF00","#FF00FF","#00FFFF",
-"#000000","#FFFFFF","#FFA500","#800080","#008000","#808080","#A52A2A","#ADD8E6","#FFC0CB","#FFD700"];
-let currentColor=colors[0];
-const palette=document.getElementById("palette");
-colors.forEach(c=>{
-  const div=document.createElement("div");
-  div.className="color"; div.style.background=c;
-  div.onclick=()=>{document.querySelectorAll(".color").forEach(x=>x.classList.remove("selected"));
-    div.classList.add("selected"); currentColor=c;};
-  palette.appendChild(div);
-});
-palette.firstChild.classList.add("selected");
+    // PC sürümünde mouse ile sürükleme
+    let isDragging = false;
+    let startX, startY, scrollLeft, scrollTop;
 
-/* Cooldown */
-let canPlace=true; let cooldownTime=10*60;
-const cooldownDiv=document.getElementById("cooldown");
-function startCooldown(){
-  canPlace=false; let t=cooldownTime;
-  const timer=setInterval(()=>{
-    t--; if(t<=0){clearInterval(timer); canPlace=true;
-      cooldownDiv.textContent="Hazır!"; cooldownDiv.style.color="lime";}
-    else{cooldownDiv.textContent=`${Math.floor(t/60)}:${String(t%60).padStart(2,"0")}`;
-      cooldownDiv.style.color="#ff4444";}
-  },1000);
-}
+    canvas.addEventListener("mousedown", (e) => {
+      isDragging = true;
+      startX = e.pageX - container.offsetLeft;
+      startY = e.pageY - container.offsetTop;
+      scrollLeft = container.scrollLeft;
+      scrollTop = container.scrollTop;
+    });
 
-/* WebSocket */
-const socket=new WebSocket("wss://pixeltur-backend.onrender.com");
-let board=[];
-socket.onmessage=e=>{
-  const data=JSON.parse(e.data);
-  if(data.type==="init"){ board=data.board; drawBoard(); }
-  if(data.type==="update"){ drawPixel(data.x,data.y,data.color); }
-};
+    canvas.addEventListener("mouseup", () => {
+      isDragging = false;
+    });
 
-/* Çizim */
-function drawBoard(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  board.forEach(p=>{
-    ctx.fillStyle=p.color;
-    ctx.fillRect(p.x*cellSize,p.y*cellSize,cellSize,cellSize);
-  });
-}
-function drawPixel(x,y,color){
-  ctx.fillStyle=color;
-  ctx.fillRect(x*cellSize,y*cellSize,cellSize,cellSize);
-}
+    canvas.addEventListener("mouseleave", () => {
+      isDragging = false;
+    });
 
-/* Tıklama – sadece canvas koordinatı */
-canvas.addEventListener("click",e=>{
-  if(!canPlace)return;
-  const rect=canvas.getBoundingClientRect();
-  const x=Math.floor((e.clientX-rect.left)/cellSize);
-  const y=Math.floor((e.clientY-rect.top)/cellSize);
-  if(x>=0&&x<gridSize&&y>=0&&y<gridSize){
-    socket.send(JSON.stringify({type:"place",x,y,color:currentColor}));
-    startCooldown();
-  }
-});
-</script>
+    canvas.addEventListener("mousemove", (e) => {
+      if (!isDragging) return;
+      e.preventDefault();
+      const x = e.pageX - container.offsetLeft;
+      const y = e.pageY - container.offsetTop;
+      const walkX = x - startX;
+      const walkY = y - startY;
+      container.scrollLeft = scrollLeft - walkX;
+      container.scrollTop = scrollTop - walkY;
+    });
+  </script>
 </body>
 </html>
