@@ -27,8 +27,13 @@
   /* Mobilde butonları büyüt */
   @media (max-width: 768px) {
     .color {
-      width:40px;
-      height:40px;
+      width:50px;
+      height:50px;
+      border:2px solid #555;
+    }
+    #palette {
+      gap:10px;
+      padding:12px;
     }
   }
 </style>
@@ -86,25 +91,35 @@ socket.onmessage=e=>{
   if(data.type==="update"){ drawPixel(data.x,data.y,data.color); }
 };
 
+/* Zoom state */
+let scale=1;
+let lastDist=0;
+
 /* Çizim */
 function drawBoard(){
+  ctx.save();
+  ctx.setTransform(scale,0,0,scale,0,0);
   ctx.clearRect(0,0,canvas.width,canvas.height);
   board.forEach(p=>{
     ctx.fillStyle=p.color;
     ctx.fillRect(p.x*cellSize,p.y*cellSize,cellSize,cellSize);
   });
+  ctx.restore();
 }
 function drawPixel(x,y,color){
+  ctx.save();
+  ctx.setTransform(scale,0,0,scale,0,0);
   ctx.fillStyle=color;
   ctx.fillRect(x*cellSize,y*cellSize,cellSize,cellSize);
+  ctx.restore();
 }
 
-/* Tıklama – sadece canvas koordinatı */
+/* Tıklama – scale hesaba katılarak */
 canvas.addEventListener("click",e=>{
   if(!canPlace)return;
   const rect=canvas.getBoundingClientRect();
-  const x=Math.floor((e.clientX-rect.left)/cellSize);
-  const y=Math.floor((e.clientY-rect.top)/cellSize);
+  const x=Math.floor((e.clientX-rect.left)/(cellSize*scale));
+  const y=Math.floor((e.clientY-rect.top)/(cellSize*scale));
   if(x>=0&&x<gridSize&&y>=0&&y<gridSize){
     socket.send(JSON.stringify({type:"place",x,y,color:currentColor}));
     startCooldown();
@@ -112,8 +127,6 @@ canvas.addEventListener("click",e=>{
 });
 
 /* Mobilde pinch-zoom desteği */
-let scale=1;
-let lastDist=0;
 canvas.addEventListener("touchmove",e=>{
   if(e.touches.length===2){
     e.preventDefault();
@@ -124,8 +137,7 @@ canvas.addEventListener("touchmove",e=>{
       const diff=dist-lastDist;
       scale+=diff*0.001;
       scale=Math.min(Math.max(scale,0.5),3); // zoom sınırı
-      canvas.style.transform=`scale(${scale})`;
-      canvas.style.transformOrigin="center center";
+      drawBoard(); // yeniden çiz
     }
     lastDist=dist;
   }
