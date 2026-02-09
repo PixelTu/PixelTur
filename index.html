@@ -11,7 +11,7 @@
     background:#222; padding:8px;
     display:flex; gap:6px; overflow-x:auto; justify-content:center;
   }
-  .color { width:24px; height:24px; border:1px solid #555; flex-shrink:0; }
+  .color { width:24px; height:24px; border:2px solid #555; flex-shrink:0; }
   .selected { border:2px solid gold; }
   #cooldown {
     position:fixed; top:10px; right:10px;
@@ -53,9 +53,9 @@ const gridSize=200, cellSize=5;
 canvas.width=gridSize*cellSize;
 canvas.height=gridSize*cellSize;
 
-/* Palet */
-const colors=["#FF0000","#00FF00","#0000FF","#FFFF00","#FF00FF","#00FFFF",
-"#000000","#FFFFFF","#FFA500","#800080","#008000","#808080","#A52A2A","#ADD8E6","#FFC0CB","#FFD700"];
+/* Palet – beyazı 2. sıraya ekledik */
+const colors=["#FF0000","#FFFFFF","#00FF00","#0000FF","#FFFF00","#FF00FF","#00FFFF",
+"#000000","#FFA500","#800080","#008000","#808080","#A52A2A","#ADD8E6","#FFC0CB","#FFD700"];
 let currentColor=colors[0];
 const palette=document.getElementById("palette");
 colors.forEach(c=>{
@@ -104,23 +104,50 @@ function drawPixel(x,y,color){
   ctx.fillRect(x*cellSize,y*cellSize,cellSize,cellSize);
 }
 
-/* Zoom state */
-let scale=1;
-let lastDist=0;
+/* Zoom + Pan state */
+let scale=1, lastDist=0;
+let isDragging=false, startX=0, startY=0, offsetX=0, offsetY=0;
 
-/* Tıklama – scale hesaba katılarak */
+function updateTransform(){
+  canvas.style.transform=`translate(${offsetX}px,${offsetY}px) scale(${scale})`;
+}
+
+/* Tıklama – scale ve offset hesaba katılarak */
 canvas.addEventListener("click",e=>{
   if(!canPlace)return;
   const rect=canvas.getBoundingClientRect();
-  const x=Math.floor((e.clientX-rect.left)/(cellSize*scale));
-  const y=Math.floor((e.clientY-rect.top)/(cellSize*scale));
+  const x=Math.floor((e.clientX-rect.left-offsetX)/(cellSize*scale));
+  const y=Math.floor((e.clientY-rect.top-offsetY)/(cellSize*scale));
   if(x>=0&&x<gridSize&&y>=0&&y<gridSize){
     socket.send(JSON.stringify({type:"place",x,y,color:currentColor}));
     startCooldown();
   }
 });
 
-/* Mobilde pinch-zoom desteği (transform ile) */
+/* PC – mouse wheel zoom */
+canvas.addEventListener("wheel",e=>{
+  e.preventDefault();
+  scale += e.deltaY * -0.001;
+  scale = Math.min(Math.max(scale,0.5),3);
+  canvas.style.transformOrigin=`${e.offsetX}px ${e.offsetY}px`;
+  updateTransform();
+});
+
+/* PC – pan (drag) */
+canvas.addEventListener("mousedown",e=>{
+  isDragging=true; startX=e.clientX-offsetX; startY=e.clientY-offsetY;
+});
+canvas.addEventListener("mousemove",e=>{
+  if(isDragging){
+    offsetX=e.clientX-startX;
+    offsetY=e.clientY-startY;
+    updateTransform();
+  }
+});
+canvas.addEventListener("mouseup",()=>{isDragging=false;});
+canvas.addEventListener("mouseleave",()=>{isDragging=false;});
+
+/* Mobil – pinch zoom + pan */
 canvas.addEventListener("touchmove",e=>{
   if(e.touches.length===2){
     e.preventDefault();
@@ -130,14 +157,30 @@ canvas.addEventListener("touchmove",e=>{
     if(lastDist){
       const diff=dist-lastDist;
       scale+=diff*0.001;
-      scale=Math.min(Math.max(scale,0.5),3); // zoom sınırı
-      canvas.style.transform=`scale(${scale})`;
-      canvas.style.transformOrigin="center center";
+      scale=Math.min(Math.max(scale,0.5),3);
+      const midX=(e.touches[0].clientX+e.touches[1].clientX)/2;
+      const midY=(e.touches[0].clientY+e.touches[1].clientY)/2;
+      const rect=canvas.getBoundingClientRect();
+      const originX=midX-rect.left;
+      const originY=midY-rect.top;
+      canvas.style.transformOrigin=`${originX}px ${originY}px`;
+      updateTransform();
     }
     lastDist=dist;
+  } else if(e.touches.length===1 && isDragging){
+    offsetX=e.touches[0].clientX-startX;
+    offsetY=e.touches[0].clientY-startY;
+    updateTransform();
   }
 });
-canvas.addEventListener("touchend",()=>{ lastDist=0; });
+canvas.addEventListener("touchstart",e=>{
+  if(e.touches.length===1){
+    isDragging=true;
+    startX=e.touches[0].clientX-offsetX;
+    startY=e.touches[0].clientY-offsetY;
+  }
+});
+canvas.addEventListener("touchend",()=>{isDragging=false; lastDist=0;});
 </script>
 </body>
 </html>
