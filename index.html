@@ -3,101 +3,48 @@
 <head>
 <meta charset="UTF-8">
 <title>PixelTur</title>
-
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
 <style>
   body { margin:0; background:#111; overflow:hidden; }
-  canvas { 
-    background:#fff; 
-    display:block; 
-    touch-action:none; 
-    margin-top:90px;      /* ÜSTTEKİ YAZILAR İÇİN BOŞLUK */
-    margin-bottom:100px;  /* PALET İÇİN BOŞLUK */
-  }
-
+  canvas { background:#fff; display:block; touch-action:none; }
   #palette {
     position:fixed; bottom:0; left:0; right:0;
     background:#222; padding:8px;
     display:flex; gap:6px; overflow-x:auto; justify-content:center;
-    border-top:1px solid #333;
-    z-index:20;
   }
-
   .color { width:24px; height:24px; border:2px solid #555; flex-shrink:0; }
   .selected { border:2px solid gold; }
-
   #cooldown {
     position:fixed; top:10px; right:10px;
     background:#222; padding:6px 10px; border-radius:6px;
     font-size:14px; font-weight:bold; color:lime;
-    z-index:20;
-    white-space:nowrap;
   }
-
   #founder {
     position:fixed; top:10px; left:10px;
     background:#222; padding:6px 10px; border-radius:6px;
     font-size:14px; font-weight:bold; color:#FFD700;
-    z-index:20;
-    white-space:nowrap;
   }
-
   #early {
     position:fixed;
-    top:55px;
+    top:50%;
     right:10px;
+    transform:translateY(-50%);
     background:#222;
     color:#FFD700;
-    padding:6px 10px;
+    padding:8px 12px;
     border-radius:6px;
     font-weight:bold;
-    font-size:13px;
-    z-index:20;
-    white-space:nowrap;
   }
 
-  /* === MOBİL DÜZELTMELER === */
+  /* Mobilde butonları büyüt */
   @media (max-width: 768px) {
-
-    #founder {
-      font-size:11px;
-      padding:4px 6px;
-      left:50%;
-      transform:translateX(-50%);
-      max-width:95%;
-      text-align:center;
-    }
-
-    #cooldown {
-      font-size:11px;
-      padding:4px 6px;
-      right:5px;
-      top:5px;
-    }
-
-    #early {
-      font-size:11px;
-      padding:4px 6px;
-      right:5px;
-      top:40px;
-    }
-
-    #palette {
-      padding:12px;
-      gap:10px;
-      height:70px;
-    }
-
     .color {
-      width:45px;
-      height:45px;
-      border-radius:8px;
+      width:50px;
+      height:50px;
+      border:2px solid #555;
     }
-
-    canvas {
-      margin-top:100px;     /* Mobilde daha fazla boşluk */
-      margin-bottom:110px;  /* Palet için daha fazla boşluk */
+    #palette {
+      gap:10px;
+      padding:12px;
     }
   }
 </style>
@@ -118,7 +65,7 @@ const gridSize=200, cellSize=5;
 canvas.width=gridSize*cellSize;
 canvas.height=gridSize*cellSize;
 
-/* Palet */
+/* Palet – beyazı 2. sıraya ekledik */
 const colors=["#FF0000","#FFFFFF","#00FF00","#0000FF","#FFFF00","#FF00FF","#00FFFF",
 "#000000","#FFA500","#800080","#008000","#808080","#A52A2A","#ADD8E6","#FFC0CB","#FFD700"];
 let currentColor=colors[0];
@@ -169,7 +116,7 @@ function drawPixel(x,y,color){
   ctx.fillRect(x*cellSize,y*cellSize,cellSize,cellSize);
 }
 
-/* Zoom + Pan */
+/* Zoom + Pan state */
 let scale=1, lastDist=0;
 let isDragging=false, startX=0, startY=0, offsetX=0, offsetY=0;
 
@@ -177,7 +124,7 @@ function updateTransform(){
   canvas.style.transform=`translate(${offsetX}px,${offsetY}px) scale(${scale})`;
 }
 
-/* Tıklama */
+/* Tıklama – scale ve offset hesaba katılarak */
 canvas.addEventListener("click",e=>{
   if(!canPlace)return;
   const rect=canvas.getBoundingClientRect();
@@ -189,7 +136,7 @@ canvas.addEventListener("click",e=>{
   }
 });
 
-/* PC zoom */
+/* PC – mouse wheel zoom */
 canvas.addEventListener("wheel",e=>{
   e.preventDefault();
   scale += e.deltaY * -0.001;
@@ -198,7 +145,7 @@ canvas.addEventListener("wheel",e=>{
   updateTransform();
 });
 
-/* PC pan */
+/* PC – pan (drag) */
 canvas.addEventListener("mousedown",e=>{
   isDragging=true; startX=e.clientX-offsetX; startY=e.clientY-offsetY;
 });
@@ -212,7 +159,7 @@ canvas.addEventListener("mousemove",e=>{
 canvas.addEventListener("mouseup",()=>{isDragging=false;});
 canvas.addEventListener("mouseleave",()=>{isDragging=false;});
 
-/* Mobil pinch zoom + pan */
+/* Mobil – pinch zoom + pan */
 canvas.addEventListener("touchmove",e=>{
   if(e.touches.length===2){
     e.preventDefault();
